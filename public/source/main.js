@@ -86,6 +86,8 @@ class Main {
                 // Extract the component to work.
                 const component = components[componentName];
                 const nodeComponent = new Node(component.tagName);
+                nodeComponent.charge = component.cardinality;
+                nodeComponent.mass = component.cardinality;
                 if (!nodeDataElement) {
 
                     nodeDataElement = nodeComponent;
