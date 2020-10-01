@@ -28,12 +28,7 @@
 
             document.addEventListener("DOMContentLoaded", () => {
 
-                const main = new Main();
-                const exceptionRet = main.create();
-                if (exceptionRet) {
-
-                    alert(`Error: ${exceptionRet.message}.`);
-                }
+                new Main();
             });
         </script>
     </head>

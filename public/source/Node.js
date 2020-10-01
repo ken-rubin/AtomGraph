@@ -3,11 +3,11 @@
 //
 
 // Define universal constants:
-const HOOKE_CONSTANT = 10;
-const COULOMB_CONSTANT = 10;
+const HOOKE_CONSTANT = 1;
+const COULOMB_CONSTANT = 1;
 const DRAG_CONSTANT = 0.01;
 const ANIMATION_SPEED_CONSTANT = 0.1;
-const MAXIMUM_VA = 100.0;
+const MAXIMUM_VA = 256.0;
 
 class Node {
 
@@ -34,17 +34,9 @@ class Node {
     renderName(context, nodeBasis) {
 
         // Draw text.
-        context.font = "20px arial";
-        context.textBaseline="middle";
-        context.textAlign="center";
-        context.fillStyle = this.colorText;
-        //context.strokeStyle = this.colorTextContext;
         context.fillText(this.name,
             this.position.x - nodeBasis.position.x,
             this.position.y - nodeBasis.position.y);
-        //context.strokeText(this.name,
-        //    this.position.x - nodeBasis.position.x,
-        //    this.position.y - nodeBasis.position.y);
     }
 
     // Render the node to the context.
@@ -62,6 +54,16 @@ class Node {
 
     // Compute the net force between this node and all its configured children.
     computeNetForce(nodeBasis, dTotalSeconds) {
+
+        if (isNaN(this.velocity.x) ||
+            isNaN(this.velocity.y)) {
+
+            this.velocity = {
+
+                x: 0,
+                y: 0
+            }
+        }
 
         // Reset force each frame with a drag calculation.
         let objectForce = {
@@ -120,26 +122,6 @@ class Node {
             objectForce.y += dHookeY;
         });
 
-        /* If vertical.
-        if (this.vertical) {
-
-            // Define a vertically bound oscilation.
-            const dXOffset = Math.sin(new Date().getTime() / 2000);
-
-            let dTheta = Math.atan2((nodeBasis.position.y - 200) - (this.position.y),
-                (nodeBasis.position.x - 30 * dXOffset) - this.position.x);
-
-            let dDistance = Math.sqrt(Math.pow((nodeBasis.position.y - 200) - this.position.y, 2) +
-                Math.pow((nodeBasis.position.x - 30 * dXOffset) - this.position.x, 2));
-
-            let dHookeMagnitude = HOOKE_CONSTANT * dDistance;
-            let dHookeX = dHookeMagnitude * Math.cos(dTheta);
-            let dHookeY = dHookeMagnitude * Math.sin(dTheta);
-
-            objectForce.x += dHookeX;
-            objectForce.y += dHookeY;
-        }*/
-
         // Store the net force with the node.
         this.force = {
 
@@ -151,6 +133,21 @@ class Node {
     // Compute the updated position of the node, given the net force.
     computePosition(dFrameSeconds, dTotalSeconds) {
 
+        if (isNaN(this.force.x) ||
+            isNaN(this.force.y)) {
+
+            this.force = {
+
+                x: 0,
+                y: 0
+            }
+        }
+
+        if (dTotalSeconds === 0) {
+
+            dTotalSeconds = 0.001;
+        }
+
         // First, cacluate acceleration.
         let objectAcceleration = {
 
@@ -161,6 +158,10 @@ class Node {
         // Normalize acceleration if magnitude > MAXIMUM_VA.
         let dAccelerationMagnitude = Math.sqrt(Math.pow(objectAcceleration.x, 2) +
             Math.pow(objectAcceleration.y, 2));
+        if (dAccelerationMagnitude === 0) {
+
+            dAccelerationMagnitude = 1;
+        }
         if (dAccelerationMagnitude > MAXIMUM_VA) {
 
             objectAcceleration = {
@@ -169,12 +170,21 @@ class Node {
                 y: MAXIMUM_VA * objectAcceleration.y / dAccelerationMagnitude,
             }
         }
+        if (isNaN(objectAcceleration.x) ||
+            isNaN(objectAcceleration.y)) {
+
+            objectAcceleration = {
+
+                x: 0,
+                y: 0
+            }
+        }
 
         // Now, calculate velocity.
         this.velocity = {
 
-            x: (this.velocity.x + objectAcceleration.x) * 0.8,
-            y: (this.velocity.y + objectAcceleration.y) * 0.8
+            x: (this.velocity.x + objectAcceleration.x) * 0.85,
+            y: (this.velocity.y + objectAcceleration.y) * 0.85
         }
 
         // Scale the velocity for the time since the last frame.
@@ -186,6 +196,10 @@ class Node {
         // Normalize scaled velocity if magnitude > MAXIMUM_VA.
         let dAccelerationScaledVelocity = Math.sqrt(Math.pow(objectScaledVelocity.x, 2) +
             Math.pow(objectScaledVelocity.y, 2));
+        if (dAccelerationScaledVelocity === 0) {
+
+            dAccelerationScaledVelocity = 1;
+        }
         if (dAccelerationScaledVelocity > MAXIMUM_VA) {
 
             objectScaledVelocity = {

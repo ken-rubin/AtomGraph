@@ -5,7 +5,7 @@
 class CanvasResizer {
 
     // Initialize object state.
-    // Accepts canvas and context to manage plus re-render callback.
+    // Accepts canvas and context.
     constructor(canvas, context, resize) {
 
         this.canvas = canvas;
@@ -31,9 +31,6 @@ class CanvasResizer {
         // Set the size, for now, from the window size.
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
-
-        this.context.translate(this.canvas.width / 2,
-            this.canvas.height / 2);
 
         // Invoke callback.
         if (this.resize) {

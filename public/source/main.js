@@ -1,13 +1,16 @@
 //////////////////////////////
 // Handles resizing canvases.
-//
+// 
 
 class Main {
 
-    create() {
+    constructor() {
 
-        this.components = {};
+        // Components come from the server.
+        const components = {};
 
+        // Go to the seerver to get the hierarchy which build the components.
+        // The rest of the processing for the application proceeds from there.
         fetch('/hierarchy', {
 
             method: 'POST',
@@ -21,58 +24,7 @@ class Main {
             return response.json();
         }).then((hierarchy) => {
 
-            /* Draw the graph.
-            const renderGraph = (renderContext, width, height) => {
-
-                // Condition the drawing context.
-                renderContext.strokeStyle = "rgba(200, 100, 50, 1)";
-                renderContext.lineWidth = 1.0;
-
-                // Draw all components.
-                const numberOfComponents = Object.keys(this.components).length;
-                const columns = Math.ceil(Math.sqrt(numberOfComponents));
-                let count = 0;
-                renderContext.beginPath();
-                for (const componentName in this.components) {
-
-                    // Extract the component to draw.
-                    const component = this.components[componentName];
-
-                    // Calculate coordinates for this component.  Store in component.
-                    component.column = count % columns;
-                    component.row = Math.floor(count++ / columns);
-                    component.x = component.column * 72 + 36;
-                    component.y = component.row * 72 + 36;
-
-                    renderContext.moveTo(component.x, component.y);
-                    renderContext.arc(component.x, component.y, 32, 0, 2 * Math.PI);
-                }
-                renderContext.stroke();
-
-                renderContext.strokeStyle = "rgba(50, 100, 200, 0.5)";
-
-                // Draw the linkages.
-                renderContext.beginPath();
-                for (const componentName in this.components) {
-
-                    // Extract the component for which to draw links.
-                    const component = this.components[componentName];
-
-                    // Loop over all linkages.
-                    for (const linkName in component.links) {
-
-                        // Get the linked component.
-                        const linkedComponent = component.links[linkName];
-
-                        // Draw a line betwixt.
-                        renderContext.moveTo(component.x, component.y);
-                        renderContext.lineTo(linkedComponent.x, linkedComponent.y);
-                    }
-                }
-                renderContext.stroke();
-            };*/
-
-            // Process hierarchy into top-level nodes.
+            // Process hierarchy into top-level components.
             for (const key in hierarchy) {
 
                 const node = hierarchy[key];
@@ -83,19 +35,17 @@ class Main {
                         if (child.tagName) {
 
                             child.links = {};
-                            this.components[child.tagName] = child;
-                            //this.components[child.tagName].node = new Node(child.tagName);
-                            //nodes.push(this.components[child.tagName].node);
+                            components[child.tagName] = child;
                         }
                     });
                 }
             }
 
             // Process hierarhcy and components into links.
-            for (const componentName in this.components) {
+            for (const componentName in components) {
 
                 // Extract the component to work.
-                const component = this.components[componentName];
+                const component = components[componentName];
 
                 // Define a function that processes all the children of the component.
                 const processChildren = (parent) => {
@@ -107,15 +57,13 @@ class Main {
                         parent.children.forEach((child) => {
 
                             // Try to get the component with the name of the tag.
-                            const childComponent = this.components[child.tagName];
+                            const childComponent = components[child.tagName];
 
                             // If the child component exists...
                             if (childComponent) {
 
                                 // ...link.
                                 component.links[child.tagName] = childComponent;
-                                //component.node.hookeChildren.push(childComponent.node);
-                                //childComponent.node.hookeChildren.push(component.node);
                             }
 
                             // Recurse down.
@@ -128,25 +76,53 @@ class Main {
                 processChildren(component);
             }
 
-            // Setup nodes relative to some component.
+            // Here, components holds the root elements and their linkages.
+            const nodes = [];
+            let nodeDataElement = null;
 
-            // Choose some component to be the root.
-            let componentMostConnected = this.components[Object.keys(this.components)[0]];
-            for (const componentName in this.components) {
+            // Create a node for each component.
+            for (const componentName in components) {
 
                 // Extract the component to work.
-                const component = this.components[componentName];
-                if (Object.keys(component.links).length > 
-                    Object.keys(componentMostConnected.links).length) {
+                const component = components[componentName];
+                const nodeComponent = new Node(component.tagName);
+                if (!nodeDataElement) {
 
-                    componentMostConnected = component;
+                    nodeDataElement = nodeComponent;
+                }
+                component.node = nodeComponent;
+                nodes.push(nodeComponent);
+            }
+            // Link the nodes whose components are linked.
+            for (const componentName in components) {
+
+                // Extract the component to work.
+                const component = components[componentName];
+                for (const linkName in component.links) {
+
+                    // Extract the link to work.
+                    const link = component.links[linkName];
+
+                    component.node.hookeChildren.push(link.node);
+                    link.node.hookeChildren.push(component.node);
                 }
             }
 
+            /* Setup nodes relative to some component.
+
+            // Choose some component to be the root.
+            const componentKeys = Object.keys(components);
+            let randomIndex = Math.floor(Math.random() * componentKeys.length);
+            let componentRoot = components[componentKeys[randomIndex]];
+            while (!componentRoot.links ||
+                componentRoot.links.length) {
+
+                randomIndex = Math.floor(Math.random() * componentKeys.length);
+                componentRoot = components[componentKeys[randomIndex]];
+            }
             // Create a base node for it and add that to the nodes collection.
-            const nodes = [];
-            const nodeDataElement = new Node(componentMostConnected.tagName);
-            componentMostConnected.node = nodeDataElement;
+            const nodeDataElement = new Node(componentRoot.tagName);
+            componentRoot.node = nodeDataElement;
             nodes.push(nodeDataElement);
 
             // Add in all the links to this component.
@@ -160,19 +136,37 @@ class Main {
                     nodes.push(nodeLink);
                     parent.node.hookeChildren.push(nodeLink);
                     nodeLink.hookeChildren.push(parent.node);
-
+                    
                     if (level < 1) {
 
                         addLinks(level + 1, linkComponent);
                     }
                 }
             };
-            addLinks(0, componentMostConnected);
+            addLinks(0, componentRoot);
 
-            let theta = 0;
-            let dTheta = 0.1;
+            // Add in linkees too.
+            for (const componentName in components) {
+
+                // Extract the component to work.
+                const component = components[componentName];
+                for (const linkName in component.links) {
+
+                    if (linkName === componentRoot.tagName) {
+
+                        const nodeLinkee = new Node(componentName + "*");
+                        nodes.push(nodeLinkee);
+                        nodeDataElement.hookeChildren.push(nodeLinkee);
+                        nodeLinkee.hookeChildren.push(nodeDataElement);
+                    }                                  
+                }
+            }*/
+
+            // Prime nodes.
+            let theta = 0.1;
+            let dTheta = Math.PI * 2.0 * 2 / nodes.length;
             let r = 0;
-            let dR = 5;
+            let dR = 500 / nodes.length;
             nodes.forEach((nodeParent) => {
 
                 nodeParent.position = {
@@ -189,9 +183,69 @@ class Main {
 
             // Get canvas.
             const canvas = document.getElementById("GraphCanvas");
-
             // Get context.
             const context = canvas.getContext("2d");
+
+            let scale = 0.5;
+            let translateX = 0;
+            let translateY = 0;
+
+            const setTransform = () => {
+
+                context.setTransform(scale,
+                    0,
+                    0,
+                    scale,
+                    translateX,
+                    translateY);
+            };
+
+            canvas.addEventListener("wheel", (e) => {
+
+                scale += e.deltaY * -0.01;
+                if (scale < 0.1) {
+
+                    scale = 0.1;
+                } else if (scale > 10.0) {
+
+                    scale = 10.0;
+                }
+                setTransform();
+            });
+
+            let mouseDownPoint = null;
+            let originalX = 0;
+            let originalY = 0;
+            canvas.addEventListener("mousedown", (e) => {
+
+                mouseDownPoint = {
+
+                    x: e.clientX,
+                    y: e.clientY
+                };
+                originalX = translateX;
+                originalY = translateY;
+            });
+            canvas.addEventListener("mousemove", (e) => {
+
+                if (mouseDownPoint) {
+
+                    const dX = e.clientX - mouseDownPoint.x;
+                    translateX = originalX + dX;
+                    const dY = e.clientY - mouseDownPoint.y;
+                    translateY = originalY + dY;
+                    setTransform();
+                }
+            });
+            canvas.addEventListener("mouseup", (e) => {
+
+                mouseDownPoint = null;
+            });
+            canvas.addEventListener("mouseout", (e) => {
+
+                mouseDownPoint = null;
+            });
+
 
             // Save date of last render so each render can scale its speed smoothly.
             let dateFirstRender = new Date();
@@ -200,10 +254,10 @@ class Main {
 
                 // Compute frame time.
                 let dFrameMilliseconds = (new Date() - dateLastRender);
-                let dTotalMilliseconds = (new Date() - dateFirstRender) + 1;
+                let dTotalMilliseconds = (new Date() - dateFirstRender);
                 dateLastRender = new Date();
 
-                // Compute the nodes net force.
+                // Compute the node's net force.
                 nodes.forEach((nodeChild) => {
 
                     nodeChild.computeNetForce(nodeDataElement, dTotalMilliseconds / 1000);
@@ -216,13 +270,13 @@ class Main {
                 });
 
                 // Clear the frame.
-                context.clearRect(-canvas.width / 2,
-                    -canvas.height / 2,
-                    canvas.width,
-                    canvas.height);
+                context.clearRect(-translateX / scale,
+                    -translateY / scale,
+                    canvas.width / scale,
+                    canvas.height / scale);
 
                 // Render the links.
-                context.strokeStyle = "black";
+                context.strokeStyle = "rgba(0, 0, 0,0.1)";
                 context.beginPath();
                 nodes.forEach((nodeChild) => {
 
@@ -241,9 +295,12 @@ class Main {
                         nodeDataElement);
                 });
                 context.fill();
-                //context.stroke();
 
                 // Render the node's names.
+                context.font = "20px arial";
+                context.textBaseline = "middle";
+                context.textAlign = "center";
+                context.fillStyle = "black";
                 nodes.forEach((nodeChild) => {
 
                     nodeChild.renderName(context,
@@ -257,8 +314,13 @@ class Main {
             // Start the animation sequence.
             window.requestAnimationFrame(functionAnimate);
 
-            // Wire up canvas.
-            new CanvasResizer(canvas, context).start();
+            // Wire up canvas for resize handling.
+            new CanvasResizer(canvas, context, () => {
+
+                translateX = canvas.width / 2;
+                translateY = canvas.height / 2;
+                setTransform();
+            }).start();
         }).catch((x) => {
 
             console.error(`error: ${x.message}.`);
