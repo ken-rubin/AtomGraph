@@ -10,7 +10,7 @@
 
         const express = require('express');
         const app = express();
-        const port = process.env.port || 80;
+        const port = process.env.PORT || 80;
 
         app.use(express.json());
         app.post("/hierarchy", (req, res) => {
