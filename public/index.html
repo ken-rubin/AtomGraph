@@ -1,0 +1,44 @@
+<html>
+    <head>
+        <title>atomgraph</title>
+        <style>
+            * {
+                margin: 0px;
+                padding: 0px;
+                box-sizing: border-box;
+            }
+            body {
+
+                display: flex;
+                justify-content: stretch;
+                align-items: stretch;
+                flex-direction: column;
+            }
+            #GraphCanvas {
+
+                flex: 1 1 auto;
+                width: 100%;
+                height: 100%;
+            }
+        </style>
+        <script type="text/javascript" src="source/Node.js"></script>
+        <script type="text/javascript" src="source/CanvasResizer.js"></script>
+        <script type="text/javascript" src="source/Main.js"></script>
+        <script>
+
+            document.addEventListener("DOMContentLoaded", () => {
+
+                const main = new Main();
+                const exceptionRet = main.create();
+                if (exceptionRet) {
+
+                    alert(`Error: ${exceptionRet.message}.`);
+                }
+            });
+        </script>
+    </head>
+    <body>
+        <canvas id="GraphCanvas">
+        </canvas>
+    </body>
+</html>
