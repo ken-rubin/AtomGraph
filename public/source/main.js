@@ -165,7 +165,7 @@ class Main {
             }*/
 
             // Prime nodes.
-            let theta = 0.1;
+            let theta = 1;
             let dTheta = Math.PI * 2.0 * 2 / nodes.length;
             let r = 0;
             let dR = 500 / nodes.length;
@@ -188,7 +188,7 @@ class Main {
             // Get context.
             const context = canvas.getContext("2d");
 
-            let scale = 0.5;
+            let scale = 0.1;
             let translateX = 0;
             let translateY = 0;
 

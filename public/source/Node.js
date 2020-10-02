@@ -125,8 +125,8 @@ class Node {
         // Store the net force with the node.
         this.force = {
 
-            x: objectForce.x / dTotalSeconds,
-            y: objectForce.y / dTotalSeconds 
+            x: objectForce.x / Math.pow(dTotalSeconds, 2),
+            y: objectForce.y / Math.pow(dTotalSeconds, 2) 
         };
     }
 
@@ -151,8 +151,8 @@ class Node {
         // First, cacluate acceleration.
         let objectAcceleration = {
 
-            x: this.force.x / this.mass / dTotalSeconds,
-            y: this.force.y / this.mass / dTotalSeconds
+            x: this.force.x / this.mass / Math.pow(dTotalSeconds, 2),
+            y: this.force.y / this.mass / Math.pow(dTotalSeconds, 2)
         };
 
         // Normalize acceleration if magnitude > MAXIMUM_VA.
