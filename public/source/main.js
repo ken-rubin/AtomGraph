@@ -24,6 +24,7 @@ class Main {
             return response.json();
         }).then((hierarchy) => {
 
+            ////////////////////////////
             // Process hierarchy into top-level components.
             for (const key in hierarchy) {
 
@@ -77,8 +78,11 @@ class Main {
             }
 
             // Here, components holds the root elements and their linkages.
+
+            ////////////////////////////
+            // Turn components into force-directed graph of nodes.
             const nodes = [];
-            let nodeDataElement = null;
+            let nodeRoot = null;
 
             // Create a node for each component.
             for (const componentName in components) {
@@ -88,13 +92,14 @@ class Main {
                 const nodeComponent = new Node(component.tagName);
                 nodeComponent.charge *= component.cardinality;
                 nodeComponent.mass *= Math.pow(component.cardinality, 0.5);
-                if (!nodeDataElement) {
+                if (!nodeRoot) {
 
-                    nodeDataElement = nodeComponent;
+                    nodeRoot = nodeComponent;
                 }
                 component.node = nodeComponent;
                 nodes.push(nodeComponent);
             }
+
             // Link the nodes whose components are linked.
             for (const componentName in components) {
 
@@ -123,9 +128,9 @@ class Main {
                 componentRoot = components[componentKeys[randomIndex]];
             }
             // Create a base node for it and add that to the nodes collection.
-            const nodeDataElement = new Node(componentRoot.tagName);
-            componentRoot.node = nodeDataElement;
-            nodes.push(nodeDataElement);
+            const nodeRoot = new Node(componentRoot.tagName);
+            componentRoot.node = nodeRoot;
+            nodes.push(nodeRoot);
 
             // Add in all the links to this component.
             const addLinks = (level, parent) => {
@@ -158,8 +163,8 @@ class Main {
 
                         const nodeLinkee = new Node(componentName + "*");
                         nodes.push(nodeLinkee);
-                        nodeDataElement.hookeChildren.push(nodeLinkee);
-                        nodeLinkee.hookeChildren.push(nodeDataElement);
+                        nodeRoot.hookeChildren.push(nodeLinkee);
+                        nodeLinkee.hookeChildren.push(nodeRoot);
                     }                                  
                 }
             }*/
@@ -188,10 +193,11 @@ class Main {
             // Get context.
             const context = canvas.getContext("2d");
 
-            let scale = 0.1;
+            // Define transform bits-state and function 
+            // to set the transform to those bits.
+            let scale = 0.25;
             let translateX = 0;
             let translateY = 0;
-
             const setTransform = () => {
 
                 context.setTransform(scale,
@@ -202,6 +208,7 @@ class Main {
                     translateY);
             };
 
+            // Zoom in or out based on wheel.
             canvas.addEventListener("wheel", (e) => {
 
                 scale += e.deltaY * -0.01;
@@ -215,10 +222,11 @@ class Main {
                 setTransform();
             });
 
+            // Pan or select based on pointer events.
             let mouseDownPoint = null;
             let originalX = 0;
             let originalY = 0;
-            canvas.addEventListener("mousedown", (e) => {
+            canvas.addEventListener("pointerdown", (e) => {
 
                 mouseDownPoint = {
 
@@ -228,7 +236,7 @@ class Main {
                 originalX = translateX;
                 originalY = translateY;
             });
-            canvas.addEventListener("mousemove", (e) => {
+            canvas.addEventListener("pointermove", (e) => {
 
                 if (mouseDownPoint) {
 
@@ -239,19 +247,27 @@ class Main {
                     setTransform();
                 }
             });
-            canvas.addEventListener("mouseup", (e) => {
+            canvas.addEventListener("pointerup", (e) => {
 
                 mouseDownPoint = null;
             });
-            canvas.addEventListener("mouseout", (e) => {
+            canvas.addEventListener("pointerout", (e) => {
 
                 mouseDownPoint = null;
             });
 
+            // Get SearchInput and wire input event.
+            const inputSearch = document.getElementById("SearchInput");
+            inputSearch.addEventListener(() => {
+
+                
+            });
 
             // Save date of last render so each render can scale its speed smoothly.
             let dateFirstRender = new Date();
             let dateLastRender = new Date();
+
+            // Method updates nodes and renders.
             const functionAnimate = () => {
 
                 // Compute frame time.
@@ -262,7 +278,7 @@ class Main {
                 // Compute the node's net force.
                 nodes.forEach((nodeChild) => {
 
-                    nodeChild.computeNetForce(nodeDataElement, dTotalMilliseconds / 1000);
+                    nodeChild.computeNetForce(nodeRoot, dTotalMilliseconds / 1000);
                 });
 
                 // Adjust positions....
@@ -283,7 +299,7 @@ class Main {
                 nodes.forEach((nodeChild) => {
 
                     nodeChild.renderLinks(context,
-                        nodeDataElement);
+                        nodeRoot);
                 });
                 context.stroke();
 
@@ -294,7 +310,7 @@ class Main {
                 nodes.forEach((nodeChild) => {
 
                     nodeChild.render(context,
-                        nodeDataElement);
+                        nodeRoot);
                 });
                 context.fill();
 
@@ -306,7 +322,7 @@ class Main {
                 nodes.forEach((nodeChild) => {
 
                     nodeChild.renderName(context,
-                        nodeDataElement);
+                        nodeRoot);
                 });
 
                 // Do it again.
