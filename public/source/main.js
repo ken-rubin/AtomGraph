@@ -90,8 +90,8 @@ class Main {
                 // Extract the component to work.
                 const component = components[componentName];
                 const nodeComponent = new Node(component.tagName);
-                nodeComponent.charge *= component.cardinality;
-                nodeComponent.mass *= Math.pow(component.cardinality, 0.5);
+                nodeComponent.baseCharge = nodeComponent.charge * component.cardinality;
+                nodeComponent.baseMass = Math.pow(nodeComponent.mass * component.cardinality, 0.5);
                 if (!nodeRoot) {
 
                     nodeRoot = nodeComponent;
@@ -115,60 +115,6 @@ class Main {
                 }
             }
 
-            /* Setup nodes relative to some component.
-
-            // Choose some component to be the root.
-            const componentKeys = Object.keys(components);
-            let randomIndex = Math.floor(Math.random() * componentKeys.length);
-            let componentRoot = components[componentKeys[randomIndex]];
-            while (!componentRoot.links ||
-                componentRoot.links.length) {
-
-                randomIndex = Math.floor(Math.random() * componentKeys.length);
-                componentRoot = components[componentKeys[randomIndex]];
-            }
-            // Create a base node for it and add that to the nodes collection.
-            const nodeRoot = new Node(componentRoot.tagName);
-            componentRoot.node = nodeRoot;
-            nodes.push(nodeRoot);
-
-            // Add in all the links to this component.
-            const addLinks = (level, parent) => {
-
-                for (let linkName in parent.links) {
-
-                    const linkComponent = parent.links[linkName];
-                    const nodeLink = new Node(linkComponent.tagName);
-                    linkComponent.node = nodeLink;
-                    nodes.push(nodeLink);
-                    parent.node.hookeChildren.push(nodeLink);
-                    nodeLink.hookeChildren.push(parent.node);
-                    
-                    if (level < 1) {
-
-                        addLinks(level + 1, linkComponent);
-                    }
-                }
-            };
-            addLinks(0, componentRoot);
-
-            // Add in linkees too.
-            for (const componentName in components) {
-
-                // Extract the component to work.
-                const component = components[componentName];
-                for (const linkName in component.links) {
-
-                    if (linkName === componentRoot.tagName) {
-
-                        const nodeLinkee = new Node(componentName + "*");
-                        nodes.push(nodeLinkee);
-                        nodeRoot.hookeChildren.push(nodeLinkee);
-                        nodeLinkee.hookeChildren.push(nodeRoot);
-                    }                                  
-                }
-            }*/
-
             // Prime nodes.
             let theta = 1;
             let dTheta = Math.PI * 2.0 * 2 / nodes.length;
@@ -188,6 +134,84 @@ class Main {
                     return (nodeChild != nodeParent); });
             });
 
+            // Define this up here in case we want to re-enable 
+            // animation based on selectRootNode just below.... 
+            let dateFirstRender = new Date();
+
+            // Define the buckets for display:
+            let rootParents = [];
+            let rootChildren = [];
+            let otherNodes = [];
+            // These buckets are filled in selectRootNode, when a node is selected.
+            const selectRootNode = (nodeToSelect) => {
+
+                nodeRoot = nodeToSelect;
+                let rootComponent = components[nodeRoot.name];
+
+                rootParents = [];
+                rootChildren = [];
+                otherNodes = [];
+
+                dateFirstRender = new Date();
+
+                // Sort all nodes into one of 4 states:
+                // Either the root, parents of the root, 
+                // children of the root or other nodes.
+                for (let componentName in components) {
+
+                    let component = components[componentName];
+
+                    // Just skip if root node.
+                    if (component.node === nodeRoot) {
+
+                        nodeRoot.mass = nodeRoot.baseMass;
+                        nodeRoot.charge = nodeRoot.baseCharge;
+                        continue;
+                    }
+                    // Look for parents.
+                    let foundRootParent = null;
+                    for (let linkName in component.links) {
+
+                        if (linkName === nodeRoot.name) {
+
+                            foundRootParent = component.node;
+                            break;
+                        }
+                    }
+                    if (foundRootParent) {
+
+                        rootParents.push(foundRootParent);
+                        foundRootParent.mass = foundRootParent.baseMass;
+                        foundRootParent.charge = foundRootParent.baseCharge;
+
+                        continue;
+                    }
+                    // Look for children.
+                    let foundRootChild = null;
+                    for (let linkName in rootComponent.links) {
+
+                        if (linkName === component.node.name) {
+
+                            foundRootChild = component.node;
+                            break;
+                        }
+                    }
+                    if (foundRootChild) {
+
+                        rootChildren.push(foundRootChild);
+                        foundRootChild.mass = foundRootChild.baseMass;
+                        foundRootChild.charge = foundRootChild.baseCharge;
+                        continue;
+                    }
+                    otherNodes.push(component.node);
+                    component.node.mass = component.node.baseMass * 0.1;
+                    component.node.charge = component.node.baseCharge * 0.1;
+                }
+            };
+
+            // "Select" the root node.
+            selectRootNode(nodeRoot);
+
             // Get canvas.
             const canvas = document.getElementById("GraphCanvas");
             // Get context.
@@ -195,7 +219,7 @@ class Main {
 
             // Define transform bits-state and function 
             // to set the transform to those bits.
-            let scale = 0.25;
+            let scale = 0.5;
             let translateX = 0;
             let translateY = 0;
             const setTransform = () => {
@@ -260,11 +284,46 @@ class Main {
             const inputSearch = document.getElementById("SearchInput");
             inputSearch.addEventListener("input", () => {
 
+                const theString = inputSearch.value;
 
+                // Scan the nodes.  If the node name starts with
+                // the string being typed, then select it here.
+                if (theString) {
+
+                    let match = false;
+                    nodes.forEach((node) => {
+
+                        if (!match) {
+
+                            if (node.name.toUpperCase().startsWith(theString.toUpperCase())) {
+
+                                nodeRoot = node;
+                                match = true;
+                            } else {
+
+                                // Perhaps it is a regular expression?
+                                const regex = new RegExp("^" + theString, "i");
+                                if (regex.test(node.name)) {
+
+                                    nodeRoot = node;
+                                    match = true;
+                                }
+                            }
+                            if (match) {
+
+                                // "Select" the root node.
+                                selectRootNode(nodeRoot);
+
+                                translateX = canvas.width / 2;
+                                translateY = canvas.height / 2;
+                                setTransform();
+                            }
+                        }
+                    });
+                }
             });
 
             // Save date of last render so each render can scale its speed smoothly.
-            let dateFirstRender = new Date();
             let dateLastRender = new Date();
 
             // Method updates nodes and renders.
@@ -304,10 +363,38 @@ class Main {
                 context.stroke();
 
                 // Render the nodes.
-                context.fillStyle = "yellow";
-                context.strokeStyle = "black";
+
+                // First, the root.
+                context.fillStyle = "lightblue";
                 context.beginPath();
-                nodes.forEach((nodeChild) => {
+                nodeRoot.render(context,
+                    nodeRoot);
+                context.fill();
+
+                // Next the parents of the root node.
+                context.fillStyle = "yellow";
+                context.beginPath();
+                rootParents.forEach((nodeChild) => {
+
+                    nodeChild.render(context,
+                        nodeRoot);
+                });
+                context.fill();
+
+                // Next the children of the root node.
+                context.fillStyle = "magenta";
+                context.beginPath();
+                rootChildren.forEach((nodeChild) => {
+
+                    nodeChild.render(context,
+                        nodeRoot);
+                });
+                context.fill();
+
+                // Last the other nodes.
+                context.fillStyle = "rgba(0,255,255, 0.25)";
+                context.beginPath();
+                otherNodes.forEach((nodeChild) => {
 
                     nodeChild.render(context,
                         nodeRoot);
@@ -318,12 +405,27 @@ class Main {
                 context.font = "20px arial";
                 context.textBaseline = "middle";
                 context.textAlign = "center";
-                context.fillStyle = "black";
-                nodes.forEach((nodeChild) => {
+                context.fillStyle = "rgba(0,0,0,0.1)";
+                otherNodes.forEach((nodeChild) => {
 
                     nodeChild.renderName(context,
                         nodeRoot);
                 });
+                context.fillStyle = "rgba(0,0,0,0.7)";
+                rootChildren.forEach((nodeChild) => {
+
+                    nodeChild.renderName(context,
+                        nodeRoot);
+                });
+                context.fillStyle = "rgba(0,0,0,0.7)";
+                rootParents.forEach((nodeChild) => {
+
+                    nodeChild.renderName(context,
+                        nodeRoot);
+                });
+                context.fillStyle = "rgba(0,0,0,1)";
+                nodeRoot.renderName(context,
+                    nodeRoot);
 
                 // Do it again.
                 window.requestAnimationFrame(functionAnimate);
