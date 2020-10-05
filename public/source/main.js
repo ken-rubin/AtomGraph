@@ -164,8 +164,8 @@ class Main {
                     // Just skip if root node.
                     if (component.node === nodeRoot) {
 
-                        nodeRoot.mass = nodeRoot.baseMass;
-                        nodeRoot.charge = nodeRoot.baseCharge;
+                        nodeRoot.mass = nodeRoot.baseMass * 1000.0;
+                        nodeRoot.charge = nodeRoot.baseCharge * 0.01;
                         continue;
                     }
                     // Look for parents.
