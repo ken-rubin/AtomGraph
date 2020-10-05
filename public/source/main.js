@@ -357,9 +357,17 @@ class Main {
                 context.beginPath();
                 nodes.forEach((nodeChild) => {
 
-                    nodeChild.renderLinks(context,
-                        nodeRoot);
+                    if (nodeChild !== nodeRoot) {
+
+                        nodeChild.renderLinks(context,
+                            nodeRoot);
+                    }
                 });
+                context.stroke();
+                context.strokeStyle = "rgba(0, 0, 0,0.9)";
+                context.beginPath();
+                nodeRoot.renderLinks(context,
+                    nodeRoot);
                 context.stroke();
 
                 // Render the nodes.
