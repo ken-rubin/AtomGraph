@@ -258,9 +258,9 @@ class Main {
 
             // Get SearchInput and wire input event.
             const inputSearch = document.getElementById("SearchInput");
-            inputSearch.addEventListener(() => {
+            inputSearch.addEventListener("input", () => {
 
-                
+
             });
 
             // Save date of last render so each render can scale its speed smoothly.
