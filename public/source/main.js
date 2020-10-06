@@ -134,6 +134,9 @@ class Main {
                     return (nodeChild != nodeParent); });
             });
 
+            // Get a references to the details container div.
+            const divDetailsContainer = document.getElementById("DetailsContainerDiv");
+
             // Define this up here in case we want to re-enable 
             // animation based on selectRootNode just below.... 
             let dateFirstRender = new Date();
@@ -148,10 +151,12 @@ class Main {
                 nodeRoot = nodeToSelect;
                 let rootComponent = components[nodeRoot.name];
 
+                // Reset display buckets.
                 rootParents = [];
                 rootChildren = [];
                 otherNodes = [];
 
+                // Reset first render so the graph adjusts to the new selection.
                 dateFirstRender = new Date();
 
                 // Sort all nodes into one of 4 states:
@@ -208,8 +213,7 @@ class Main {
                     component.node.charge = component.node.baseCharge * 0.1;
                 }
 
-                // Get a references to the details container div.
-                const divDetailsContainer = document.getElementById("DetailsContainerDiv");
+                // Clear details div.
                 divDetailsContainer.innerHTML = "";
 
                 // Add some details about the component.
@@ -303,36 +307,55 @@ class Main {
                 // the string being typed, then select it here.
                 if (theString) {
 
-                    let match = false;
+                    let matches = [];
                     nodes.forEach((node) => {
 
-                        if (!match) {
+                        if (node.name.toUpperCase().startsWith(theString.toUpperCase())) {
 
-                            if (node.name.toUpperCase().startsWith(theString.toUpperCase())) {
+                            matches.push(node);
+                        } else {
 
-                                nodeRoot = node;
-                                match = true;
-                            } else {
+                            // Perhaps it is a regular expression?
+                            const regex = new RegExp("^" + theString, "i");
+                            if (regex.test(node.name)) {
 
-                                // Perhaps it is a regular expression?
-                                const regex = new RegExp("^" + theString, "i");
-                                if (regex.test(node.name)) {
-
-                                    nodeRoot = node;
-                                    match = true;
-                                }
-                            }
-                            if (match) {
-
-                                // "Select" the root node.
-                                selectRootNode(nodeRoot);
-
-                                translateX = canvas.width / 2;
-                                translateY = canvas.height / 2;
-                                setTransform();
+                                matches.push(node);
                             }
                         }
                     });
+
+                    if (matches.length === 1) {
+
+                        // "Select" the root node.
+                        selectRootNode(matches[0]);
+
+                        translateX = canvas.width / 2 + canvas.width / 8;
+                        translateY = canvas.height / 2;
+                        setTransform();
+                    } else if (matches.length > 1) {
+
+                        // Clear details container div.
+                        divDetailsContainer.innerHTML = "";
+
+                        // Load up pills into the details container div.
+                        matches.forEach((match) => {
+
+                            const divMatch = document.createElement("div");
+                            divMatch.classList.add("MatchItem");
+                            divMatch.innerText = match.name;
+                            divDetailsContainer.appendChild(divMatch);
+
+                            divMatch.addEventListener("click", () => {
+
+                                // "Select" the root node.
+                                selectRootNode(match);
+
+                                translateX = canvas.width / 2 + canvas.width / 8;
+                                translateY = canvas.height / 2;
+                                setTransform();
+                            });
+                        });
+                    }
                 }
             });
 
@@ -456,14 +479,14 @@ class Main {
                 // Render the nodes:
 
                 // First, the root.
-                context.fillStyle = "lightblue";
+                context.fillStyle = "yellow";
                 context.beginPath();
                 nodeRoot.render(context,
                     nodeRoot);
                 context.fill();
 
                 // Next the parents of the root node.
-                context.fillStyle = "yellow";
+                context.fillStyle = "lightblue";
                 context.beginPath();
                 rootParents.forEach((nodeChild) => {
 
