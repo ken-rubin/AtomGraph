@@ -299,6 +299,11 @@ class Main {
 
             // Get SearchInput and wire input event.
             const inputSearch = document.getElementById("SearchInput");
+
+            inputSearch.addEventListener("click", () => {
+
+                inputSearch.dispatchEvent(new Event("input"));
+            });
             inputSearch.addEventListener("input", () => {
 
                 const theString = inputSearch.value;
