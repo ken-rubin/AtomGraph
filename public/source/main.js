@@ -207,6 +207,53 @@ class Main {
                     component.node.mass = component.node.baseMass * 0.1;
                     component.node.charge = component.node.baseCharge * 0.1;
                 }
+
+                // Get a references to the details container div.
+                const divDetailsContainer = document.getElementById("DetailsContainerDiv");
+                divDetailsContainer.innerHTML = "";
+
+                // Add some details about the component.
+                const divName = document.createElement("div");
+                divName.classList.add("DetailItem");
+                divName.innerText = `${rootComponent.tagName} (${rootComponent.cardinality})`;
+                divDetailsContainer.appendChild(divName);
+
+                if (rootComponent.description) {
+                    
+                    const divDescription = document.createElement("div");
+                    divDescription.classList.add("DetailItem");
+                    divDescription.innerText = `${rootComponent.description}`;
+                    divName.appendChild(divDescription);
+                }
+
+                if (rootComponent.columns) {
+
+                    const divColumns = document.createElement("div");
+                    divColumns.classList.add("DetailItem");
+                    divColumns.innerText = `columns`;
+                    divDetailsContainer.appendChild(divColumns);
+
+                    rootComponent.columns.forEach((column) => {
+
+                        const divColumn = document.createElement("div");
+                        divColumn.classList.add("DetailItem");
+                        divColumn.innerText = `${column.name} [${column.type}] (${column.width})`;
+                        divColumns.appendChild(divColumn);
+                    });
+                }
+
+                if (rootComponent.subscription) {
+
+                    const divSubscriptionContainer = document.createElement("div");
+                    divSubscriptionContainer.classList.add("DetailItem");
+                    divSubscriptionContainer.innerText = `subscription`;
+                    divDetailsContainer.appendChild(divSubscriptionContainer);
+
+                    const divSubscription = document.createElement("div");
+                    divSubscription.classList.add("DetailItem");
+                    divSubscription.innerText = `${rootComponent.subscription}`;
+                    divSubscriptionContainer.appendChild(divSubscription);
+                }
             };
 
             // "Select" the root node.
@@ -244,40 +291,6 @@ class Main {
                     scale = 10.0;
                 }
                 setTransform();
-            });
-
-            // Pan or select based on pointer events.
-            let mouseDownPoint = null;
-            let originalX = 0;
-            let originalY = 0;
-            canvas.addEventListener("pointerdown", (e) => {
-
-                mouseDownPoint = {
-
-                    x: e.clientX,
-                    y: e.clientY
-                };
-                originalX = translateX;
-                originalY = translateY;
-            });
-            canvas.addEventListener("pointermove", (e) => {
-
-                if (mouseDownPoint) {
-
-                    const dX = e.clientX - mouseDownPoint.x;
-                    translateX = originalX + dX;
-                    const dY = e.clientY - mouseDownPoint.y;
-                    translateY = originalY + dY;
-                    setTransform();
-                }
-            });
-            canvas.addEventListener("pointerup", (e) => {
-
-                mouseDownPoint = null;
-            });
-            canvas.addEventListener("pointerout", (e) => {
-
-                mouseDownPoint = null;
             });
 
             // Get SearchInput and wire input event.
@@ -321,6 +334,76 @@ class Main {
                         }
                     });
                 }
+            });
+
+            // Pan or select based on pointer events.
+            let mouseDownPoint = null;
+            let originalX = 0;
+            let originalY = 0;
+            let lastClickTime = null;
+            canvas.addEventListener("pointerdown", (e) => {
+
+                if (lastClickTime &&
+                    new Date() - lastClickTime < 250) {
+
+                    // Test if press down on node.
+                    // If so, circumvent the normal
+                    // path for canvas dragging.
+
+                    // Calculate the point coordinates in "node"-space.
+                    const nodeX = (e.clientX - translateX) / scale;
+                    const nodeY = (e.clientY - translateY) / scale;
+
+                    // Loop over all nodes.
+                    let picked = false;
+                    nodes.forEach((node) => {
+
+                        if (!picked &&
+                            Math.abs((node.position.x - nodeRoot.position.x) - nodeX) < 20 / scale &&
+                            Math.abs((node.position.y - nodeRoot.position.y) - nodeY) < 20 / scale) {
+
+                            picked = true;
+
+                            inputSearch.value = "^" + node.name + "$";
+
+                            // "Select" the node as root.
+                            selectRootNode(node);
+
+                            translateX = canvas.width / 2 + canvas.width / 8;
+                            translateY = canvas.height / 2;
+                            setTransform();
+
+                        }
+                    });
+                }
+                lastClickTime = new Date();
+
+                mouseDownPoint = {
+
+                    x: e.clientX,
+                    y: e.clientY
+                };
+                originalX = translateX;
+                originalY = translateY;
+            });
+            canvas.addEventListener("pointermove", (e) => {
+
+                if (mouseDownPoint) {
+
+                    const dX = e.clientX - mouseDownPoint.x;
+                    translateX = originalX + dX;
+                    const dY = e.clientY - mouseDownPoint.y;
+                    translateY = originalY + dY;
+                    setTransform();
+                }
+            });
+            canvas.addEventListener("pointerup", (e) => {
+
+                mouseDownPoint = null;
+            });
+            canvas.addEventListener("pointerout", (e) => {
+
+                mouseDownPoint = null;
             });
 
             // Save date of last render so each render can scale its speed smoothly.
@@ -370,7 +453,7 @@ class Main {
                     nodeRoot);
                 context.stroke();
 
-                // Render the nodes.
+                // Render the nodes:
 
                 // First, the root.
                 context.fillStyle = "lightblue";
@@ -445,7 +528,7 @@ class Main {
             // Wire up canvas for resize handling.
             new CanvasResizer(canvas, context, () => {
 
-                translateX = canvas.width / 2;
+                translateX = canvas.width / 2 + canvas.width / 8;
                 translateY = canvas.height / 2;
                 setTransform();
             }).start();

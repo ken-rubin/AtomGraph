@@ -4,6 +4,20 @@
     "children": [
       {
         "tagName": "ActivityGrid",
+        "description": "Keeps track of activity...",
+        "columns": [{
+            "name": "A",
+            "type": "text",
+            "width": 160
+        }, {
+            "name": "B",
+            "type": "date",
+            "width": 40
+        }, {
+            "name": "C",
+            "type": "number",
+            "width": 70
+        }],
         "children": [
           {
             "tagName": "MainGridWrapper",
@@ -9995,6 +10009,7 @@
     "children": [
       {
         "tagName": "LiquidityScore",
+        "subscription": "Liquidity",
         "children": [
           {
             "tagName": "LiquidityScoreWrapper",

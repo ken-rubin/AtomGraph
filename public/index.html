@@ -33,7 +33,7 @@
                 height: 30px;
 
                 background: rgba(255, 255, 255, 0.75);
-                box-shadow: 0px 0px 10px white;
+                box-shadow: 0px 0px 10px rgb(150,150,150);
 
                 border: 1px solid black;
                 border-radius: 10px;
@@ -49,6 +49,44 @@
                 border: none;
                 outline: none;
             }
+            #DetailsContainerDiv {
+
+                display: flex;
+                flex-direction: column;
+                align-items: stretch;
+                justify-content: flex-start;
+                z-index: 2;
+                position: absolute;
+                left: 32px;
+                top: 64px;
+                width: 25%;
+                bottom: 64px;
+
+                background: rgba(255, 255, 255, 0.75);
+                box-shadow: 0px 0px 10px rgb(150,150,150);
+
+                border: 1px solid black;
+                border-radius: 10px;
+
+                padding: 10px;
+
+                overflow-y: auto;
+            }
+            .DetailItem {
+
+                flex: 0 0 auto;
+
+                border: 1px solid black;
+                border-radius: 4px;
+
+                padding: 4px;
+                margin: 4px;
+
+                display: flex;
+                flex-direction: column;
+                align-items: stretch;
+                justify-content: flex-start;
+            }
         </style>
         <script type="text/javascript" src="source/Node.js"></script>
         <script type="text/javascript" src="source/CanvasResizer.js"></script>
@@ -62,10 +100,12 @@
         </script>
     </head>
     <body>
+        <canvas id="GraphCanvas">
+        </canvas>
         <div id="SearchInputContainerDiv">
             <input id="SearchInput" value="^A.*Grid$" />
         </div>
-        <canvas id="GraphCanvas">
-        </canvas>
+        <div id="DetailsContainerDiv">
+        </div>
     </body>
 </html>
