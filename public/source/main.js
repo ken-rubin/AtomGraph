@@ -6,9 +6,6 @@ class Main {
 
     constructor() {
 
-        // Components come from the server.
-        const components = {};
-
         // Go to the seerver to get the hierarchy which build the components.
         // The rest of the processing for the application proceeds from there.
         fetch('/hierarchy', {
@@ -26,19 +23,18 @@ class Main {
 
             ////////////////////////////
             // Process hierarchy into top-level components.
+
+            const components = {};
             for (const key in hierarchy) {
 
                 const node = hierarchy[key];
                 if (node.children) {
 
-                    node.children.forEach((child) => {
+                    if (node.tagName) {
 
-                        if (child.tagName) {
-
-                            child.links = {};
-                            components[child.tagName] = child;
-                        }
-                    });
+                        node.links = {};
+                        components[node.tagName] = node;
+                    }
                 }
             }
 
@@ -81,8 +77,7 @@ class Main {
 
             ////////////////////////////
             // Turn components into force-directed graph of nodes.
-            const nodes = [];
-            let nodeRoot = null;
+            let nodes = [];
 
             // Create a node for each component.
             for (const componentName in components) {
@@ -90,12 +85,10 @@ class Main {
                 // Extract the component to work.
                 const component = components[componentName];
                 const nodeComponent = new Node(component.tagName);
+                nodeComponent.children = [];
+                nodeComponent.notes = component.notes;
                 nodeComponent.baseCharge = nodeComponent.charge * component.cardinality;
                 nodeComponent.baseMass = Math.pow(nodeComponent.mass * component.cardinality, 0.5);
-                if (!nodeRoot) {
-
-                    nodeRoot = nodeComponent;
-                }
                 component.node = nodeComponent;
                 nodes.push(nodeComponent);
             }
@@ -110,16 +103,20 @@ class Main {
                     // Extract the link to work.
                     const link = component.links[linkName];
 
+                    component.node.children.push(link.node);
                     component.node.hookeChildren.push(link.node);
                     link.node.hookeChildren.push(component.node);
                 }
             }
 
+            ///////////////////////////////////////////////
+            // DO NOT REFER TO COMPONENTS BELOW THIS LINE!
+
             // Prime nodes.
             let theta = 1;
             let dTheta = Math.PI * 2.0 * 2 / nodes.length;
             let r = 0;
-            let dR = 500 / nodes.length;
+            let dR = 0.1;
             nodes.forEach((nodeParent) => {
 
                 nodeParent.position = {
@@ -134,22 +131,87 @@ class Main {
                     return (nodeChild != nodeParent); });
             });
 
+            // Helper method ensures there is at least one node.
+            const makeSureThereIsAtLeastOneNode = () => {
+
+                // Make sure there is at least one node.
+                if (!nodes.length) {
+
+                    // Generate new, unique name.
+                    let newName = "node " + Math.floor(Math.random() * 1000000).toString();
+
+                    // Add new node.
+                    const newNode = new Node(newName);
+                    newNode.notes = "";
+                    newNode.children = [];
+                    newNode.position = {
+
+                        x: rootNode.position.x + r * Math.cos(theta),
+                        y: rootNode.position.y + r * Math.sin(theta)
+                    };
+                    r += dR;
+                    theta += dTheta;
+                    newNode.baseCharge = newNode.charge;
+                    newNode.baseMass = Math.pow(newNode.mass, 0.5);
+
+                    // Add new node to nodes collection.
+                    nodes.push(newNode);
+                }
+            };
+            makeSureThereIsAtLeastOneNode();
+
             // Get a references to the details container div.
             const divDetailsContainer = document.getElementById("DetailsContainerDiv");
+
+            // Helper method loads up the details selection with a set of 
+            // clickable pills and takes a callback to invoke when clicked.
+            const loadUpDetailSectionWithClickablePills = (title, matches, clickCallback) => {
+
+                // Clear details container div.
+                divDetailsContainer.innerHTML = "";
+
+                // Add title.
+                const divTitle = document.createElement("div");
+                divTitle.classList.add("DetailItem");
+                divTitle.innerText = title;
+                divDetailsContainer.appendChild(divTitle);
+
+                // Load up pills into the details container div.
+                matches.forEach((match) => {
+
+                    const divMatch = document.createElement("div");
+                    divMatch.classList.add("MatchItem");
+                    divMatch.innerText = match.name;
+                    divDetailsContainer.appendChild(divMatch);
+
+                    divMatch.addEventListener("click", () => {
+                        
+                        clickCallback(match);
+                    });
+                });
+            };
 
             // Define this up here in case we want to re-enable 
             // animation based on selectRootNode just below.... 
             let dateFirstRender = new Date();
 
             // Define the buckets for display:
+            let rootNode = nodes.find((node) => {
+
+                return node.name === "WatchListFromName";
+            });
+            if (!rootNode) {
+
+                rootNode = nodes[0];
+            }
             let rootParents = [];
             let rootChildren = [];
             let otherNodes = [];
+
             // These buckets are filled in selectRootNode, when a node is selected.
             const selectRootNode = (nodeToSelect) => {
 
-                nodeRoot = nodeToSelect;
-                let rootComponent = components[nodeRoot.name];
+                rootNode = nodeToSelect;
 
                 // Reset display buckets.
                 rootParents = [];
@@ -162,106 +224,393 @@ class Main {
                 // Sort all nodes into one of 4 states:
                 // Either the root, parents of the root, 
                 // children of the root or other nodes.
-                for (let componentName in components) {
+                nodes.forEach((node) => {
 
-                    let component = components[componentName];
+                    if (node == rootNode) {
 
-                    // Just skip if root node.
-                    if (component.node === nodeRoot) {
+                        rootNode.mass = rootNode.baseMass * rootNode.hookeChildren.length;
+                        rootNode.charge = rootNode.baseCharge * rootNode.hookeChildren.length;
+                    } else {
 
-                        nodeRoot.mass = nodeRoot.baseMass * 1000.0;
-                        nodeRoot.charge = nodeRoot.baseCharge * 0.01;
-                        continue;
-                    }
-                    // Look for parents.
-                    let foundRootParent = null;
-                    for (let linkName in component.links) {
+                        let parent = false;
+                        node.children.forEach((child) => {
 
-                        if (linkName === nodeRoot.name) {
+                            if (child === rootNode) {
 
-                            foundRootParent = component.node;
-                            break;
+                                rootParents.push(node);
+                                node.mass = node.baseMass;
+                                node.charge = node.baseCharge;
+                                parent = true;
+                            }
+                        });
+
+                        if (!parent) {
+
+                            let child = false;
+                            rootNode.children.forEach((child) => {
+
+                                if (child === node) {
+
+                                    rootChildren.push(node);
+                                    node.mass = node.baseMass;
+                                    node.charge = node.baseCharge;
+                                    child = true;
+                                }
+                            });
+
+                            if (!child) {
+
+                                otherNodes.push(node);
+                                node.mass = node.baseMass;
+                                node.charge = node.baseCharge;
+                            }
                         }
                     }
-                    if (foundRootParent) {
-
-                        rootParents.push(foundRootParent);
-                        foundRootParent.mass = foundRootParent.baseMass;
-                        foundRootParent.charge = foundRootParent.baseCharge;
-
-                        continue;
-                    }
-                    // Look for children.
-                    let foundRootChild = null;
-                    for (let linkName in rootComponent.links) {
-
-                        if (linkName === component.node.name) {
-
-                            foundRootChild = component.node;
-                            break;
-                        }
-                    }
-                    if (foundRootChild) {
-
-                        rootChildren.push(foundRootChild);
-                        foundRootChild.mass = foundRootChild.baseMass;
-                        foundRootChild.charge = foundRootChild.baseCharge;
-                        continue;
-                    }
-                    otherNodes.push(component.node);
-                    component.node.mass = component.node.baseMass * 0.1;
-                    component.node.charge = component.node.baseCharge * 0.1;
-                }
+                });
 
                 // Clear details div.
                 divDetailsContainer.innerHTML = "";
 
-                // Add some details about the component.
+                // Add editable name of the node.
                 const divName = document.createElement("div");
                 divName.classList.add("DetailItem");
-                divName.innerText = `${rootComponent.tagName} (${rootComponent.cardinality})`;
                 divDetailsContainer.appendChild(divName);
 
-                if (rootComponent.description) {
-                    
-                    const divDescription = document.createElement("div");
-                    divDescription.classList.add("DetailItem");
-                    divDescription.innerText = `${rootComponent.description}`;
-                    divName.appendChild(divDescription);
-                }
+                const inputName = document.createElement("input");
+                inputName.classList.add("DetailItemInputChild");
+                inputName.value = `${rootNode.name}`;
+                divName.appendChild(inputName);
+                inputName.addEventListener("input", () => {
 
-                if (rootComponent.columns) {
+                    // Make sure that value is valid....
+                    if (inputName.value === "") {
 
-                    const divColumns = document.createElement("div");
-                    divColumns.classList.add("DetailItem");
-                    divColumns.innerText = `columns`;
-                    divDetailsContainer.appendChild(divColumns);
+                        inputName.value = ".";
+                    }
+                    let matched = "";
+                    do {
 
-                    rootComponent.columns.forEach((column) => {
+                        matched = "";
+                        nodes.forEach((node) => {
 
-                        const divColumn = document.createElement("div");
-                        divColumn.classList.add("DetailItem");
-                        divColumn.innerText = `${column.name} [${column.type}] (${column.width})`;
-                        divColumns.appendChild(divColumn);
+                            if (node.name === inputName.value &&
+                                inputName.value !== rootNode.name) {
+
+                                matched = node.name;
+                            }
+                        });
+                        if (matched) {
+
+                            inputName.value = matched + "+";
+                        }
+                    } while (matched);
+
+                    // Update node name.
+                    rootNode.name = inputName.value;
+                });
+
+                const divButtonGroup = document.createElement("div");
+                divButtonGroup.classList.add("DetailGroup");
+
+                // Add in action buttons.
+                const buttonLink = document.createElement("button");
+                buttonLink.classList.add("DetailButton");
+                buttonLink.innerText = `link`;
+                divButtonGroup.appendChild(buttonLink);
+                buttonLink.addEventListener("click", () => {
+
+                    // Build up collection of matches to present here.
+                    // All nodes, except those which are already linked.
+                    const matches = [];
+                    nodes.forEach((node) => {
+
+                        if (node !== rootNode &&
+                            !rootNode.children.includes(node)) {
+
+                            matches.push(node);
+                        }
                     });
-                }
+                    loadUpDetailSectionWithClickablePills("link nodes:", matches, (match) => {
 
-                if (rootComponent.subscription) {
+                        // A match (a node) to the collection of children
+                        // and to the hook children.  and root to its....
+                        rootNode.children.push(match);
+                        rootNode.hookeChildren.push(match);
+                        match.hookeChildren.push(rootNode);
 
-                    const divSubscriptionContainer = document.createElement("div");
-                    divSubscriptionContainer.classList.add("DetailItem");
-                    divSubscriptionContainer.innerText = `subscription`;
-                    divDetailsContainer.appendChild(divSubscriptionContainer);
+                        // Re load up.
+                        selectRootNode(rootNode);
+                    });
+                });
 
-                    const divSubscription = document.createElement("div");
-                    divSubscription.classList.add("DetailItem");
-                    divSubscription.innerText = `${rootComponent.subscription}`;
-                    divSubscriptionContainer.appendChild(divSubscription);
-                }
+                const buttonUnlink = document.createElement("button");
+                buttonUnlink.classList.add("DetailButton");
+                buttonUnlink.innerText = `unlink`;
+                divButtonGroup.appendChild(buttonUnlink);
+                buttonUnlink.addEventListener("click", () => {
+
+                    loadUpDetailSectionWithClickablePills("unlink nodes:", rootNode.children, (match) => {
+
+                        // Remove match (a node) from the collection of children
+                        // and from the hook children.  and root from its....
+                        rootNode.children = rootNode.children.filter((node) => {
+
+                            return node !== match;
+                        });
+                        rootNode.hookeChildren = rootNode.hookeChildren.filter((node) => {
+
+                            return node !== match;
+                        });
+                        match.hookeChildren = match.hookeChildren.filter((node) => {
+
+                            return node !== rootNode;
+                        });
+
+                        // Re load up.
+                        selectRootNode(rootNode);
+                    });
+                });
+
+                const buttonAddChild = document.createElement("button");
+                buttonAddChild.classList.add("DetailButton");
+                buttonAddChild.innerText = `add child`;
+                divButtonGroup.appendChild(buttonAddChild);
+                buttonAddChild.addEventListener("click", () => {
+
+                    // Generate new, unique name.
+                    let newName = "node " + Math.floor(Math.random() * 1000000).toString();
+
+                    // Add new node.
+                    const newNode = new Node(newName);
+                    newNode.position = {
+
+                        x: rootNode.position.x + r * Math.cos(theta),
+                        y: rootNode.position.y + r * Math.sin(theta)
+                    };
+                    r += dR;
+                    theta += dTheta;
+                    newNode.baseCharge = newNode.charge;
+                    newNode.baseMass = Math.pow(newNode.mass, 0.5);
+                    newNode.children = [];
+                    newNode.notes = "";
+
+                    // Add node as coulomb child of all other nodes.
+                    nodes.forEach((node) => {
+
+                        node.coulombChildren.push(newNode);
+                    });
+
+                    // Add hook children from root node to new node and back.
+                    rootNode.hookeChildren.push(newNode);
+                    newNode.hookeChildren.push(rootNode);
+
+                    // Add new node as child of rootNode
+                    rootNode.children.push(newNode);
+
+                    // Add new node to nodes collection.
+                    nodes.push(newNode);
+
+                    // Rebuild collections.
+                    selectRootNode(rootNode);
+                });
+
+                const buttonSave = document.createElement("button");
+                buttonSave.classList.add("DetailButton");
+                buttonSave.innerText = `save`;
+                divButtonGroup.appendChild(buttonSave);
+                buttonSave.addEventListener("click", () => {
+
+                    // Generate replete hierarchy from nodes.
+                    const returnHierarchy = {};
+                    nodes.forEach((node) => {
+
+                        const nodeComponent = {
+
+                            tagName: node.name,
+                            cardinality: 1,
+                            notes: node.notes,
+                            children: []
+                        };
+
+                        node.children.forEach((child) => {
+
+                            nodeComponent.children.push({
+
+                                tagName: child.name,
+                                children: []
+                            });
+                        });
+
+                        returnHierarchy[node.name] = nodeComponent;
+                    });
+
+                    // Send to server.
+                    fetch('/save', {
+
+                        method: 'POST',
+                        headers: {
+
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(returnHierarchy)
+                    }).then((response) => {
+
+                        return response.json();
+                    }).then(() => {
+
+                    }).catch((x) => {
+
+                        alert(x.message);
+                    });
+                });
+
+                const buttonMerge = document.createElement("button");
+                buttonMerge.classList.add("DetailButton");
+                buttonMerge.innerText = `merge`;
+                divButtonGroup.appendChild(buttonMerge);
+                buttonMerge.addEventListener("click", () => {
+
+                    // Get the name root.
+                    let nodeNameBase = rootNode.name;
+                    while (nodeNameBase.endsWith("+")) {
+
+                        nodeNameBase = nodeNameBase.substr(0, nodeNameBase.length - 1);
+                    }
+
+                    // Find all nodes the start with the base node name.
+                    const nodesToMerge = [];
+                    nodes.forEach((node) => {
+
+                        if (node !== rootNode &&
+                            node.name.startsWith(nodeNameBase)) {
+
+                            nodesToMerge.push(node);
+                        }
+                    });
+
+                    // Process each node to merge
+                    nodesToMerge.forEach((mergee) => {
+
+                        // Move over all the hook children.
+                        mergee.hookeChildren.forEach((child) => {
+
+                            if (!rootNode.hookeChildren.includes(child)) {
+
+                                rootNode.hookeChildren.push(child);
+                            }
+
+                            // Eliminate the other side, and redirect to nodeRoot.
+                            child.hookeChildren = child.hookeChildren.filter((hc) => {
+
+                                return hc !== mergee;
+                            });
+                            if (!child.hookeChildren.includes(rootNode)) {
+
+                                child.hookeChildren.push(rootNode);
+                            }
+                        });
+
+                        // Move over all children.
+                        mergee.children.forEach((child) => {
+
+                            if (!rootNode.children.includes(child)) {
+
+                                rootNode.children.push(child);
+                            }
+                        })
+
+                        // Remove all the coulomb children.
+                        nodes.forEach((node) => {
+
+                            node.coulombChildren = node.coulombChildren.filter((child) => {
+
+                                return (child !== mergee);
+                            });
+                        });
+
+                        // Remove from nodes.
+                        nodes = nodes.filter((node) => {
+
+                            return (node !== mergee);
+                        });
+                    });
+
+                    //////////////////////
+                    // Finally, rename node to base.
+
+                    // Update node name.
+                    rootNode.name = nodeNameBase;
+
+                    // Reselect current node.
+                    selectRootNode(rootNode);
+                });
+
+                const buttonDelete = document.createElement("button");
+                buttonDelete.classList.add("DetailButton");
+                buttonDelete.innerText = `delete`;
+                divButtonGroup.appendChild(buttonDelete);
+                buttonDelete.addEventListener("click", () => {
+
+                    // Remove from all node collections.
+                    nodes.forEach((node) => {
+
+                        node.children = node.children.filter((child) => {
+
+                            return (child !== rootNode);
+                        });
+                        node.hookeChildren = node.hookeChildren.filter((child) => {
+
+                            return (child !== rootNode);
+                        });
+                        node.coulombChildren = node.coulombChildren.filter((child) => {
+
+                            return (child !== rootNode);
+                        });
+                    });
+
+                    // Delete current node.
+                    nodes = nodes.filter((node) => {
+
+                        return (node !== rootNode);
+                    });
+
+                    // Make sure there is at least one node.
+                    makeSureThereIsAtLeastOneNode();
+
+                    // Choose a new root.
+                    let newRoot = (rootNode.children.length ? rootNode.children[0] :
+                        nodes[0]);
+                    selectRootNode(newRoot);
+                });
+                
+                const divNotes = document.createElement("div");
+                divNotes.classList.add("DetailItem");
+                divNotes.classList.add("FlexGrow");
+                divNotes.innerText = `notes`;
+
+                // Add editable name of the node.
+                const divNote = document.createElement("div");
+                divNote.classList.add("DetailItem");
+                divNote.classList.add("FlexGrow");
+                divNotes.appendChild(divNote);
+
+                const inputNotes = document.createElement("TextArea");
+                inputNotes.classList.add("DetailItemInputChild");
+                inputNotes.classList.add("NoResize");
+                inputNotes.value = `${(rootNode.notes ? rootNode.notes : "")}`;
+                divNote.appendChild(inputNotes);
+                inputNotes.addEventListener("input", () => {
+
+                    // Save....
+                    rootNode.notes = inputNotes.value;
+                });
+
+                divDetailsContainer.appendChild(divNotes);
+                divDetailsContainer.appendChild(divButtonGroup);
             };
 
             // "Select" the root node.
-            selectRootNode(nodeRoot);
+            selectRootNode(rootNode);
 
             // Get canvas.
             const canvas = document.getElementById("GraphCanvas");
@@ -339,18 +688,8 @@ class Main {
                         setTransform();
                     } else if (matches.length > 1) {
 
-                        // Clear details container div.
-                        divDetailsContainer.innerHTML = "";
-
-                        // Load up pills into the details container div.
-                        matches.forEach((match) => {
-
-                            const divMatch = document.createElement("div");
-                            divMatch.classList.add("MatchItem");
-                            divMatch.innerText = match.name;
-                            divDetailsContainer.appendChild(divMatch);
-
-                            divMatch.addEventListener("click", () => {
+                        loadUpDetailSectionWithClickablePills("select node:", matches,
+                            (match) => {
 
                                 // "Select" the root node.
                                 selectRootNode(match);
@@ -359,7 +698,6 @@ class Main {
                                 translateY = canvas.height / 2;
                                 setTransform();
                             });
-                        });
                     }
                 }
             });
@@ -387,8 +725,8 @@ class Main {
                     nodes.forEach((node) => {
 
                         if (!picked &&
-                            Math.abs((node.position.x - nodeRoot.position.x) - nodeX) < 20 / scale &&
-                            Math.abs((node.position.y - nodeRoot.position.y) - nodeY) < 20 / scale) {
+                            Math.abs((node.position.x - rootNode.position.x) - nodeX) < 20 / scale &&
+                            Math.abs((node.position.y - rootNode.position.y) - nodeY) < 20 / scale) {
 
                             picked = true;
 
@@ -448,7 +786,7 @@ class Main {
                 // Compute the node's net force.
                 nodes.forEach((nodeChild) => {
 
-                    nodeChild.computeNetForce(nodeRoot, dTotalMilliseconds / 1000);
+                    nodeChild.computeNetForce(rootNode, dTotalMilliseconds / 1000);
                 });
 
                 // Adjust positions....
@@ -468,26 +806,29 @@ class Main {
                 context.beginPath();
                 nodes.forEach((nodeChild) => {
 
-                    if (nodeChild !== nodeRoot) {
+                    if (nodeChild !== rootNode) {
 
                         nodeChild.renderLinks(context,
-                            nodeRoot);
+                            rootNode);
                     }
                 });
                 context.stroke();
+
+                // Render the root node links.
                 context.strokeStyle = "rgba(0, 0, 0,0.9)";
                 context.beginPath();
-                nodeRoot.renderLinks(context,
-                    nodeRoot);
+                rootNode.renderLinks(context,
+                    rootNode);
                 context.stroke();
 
+                ///////////////////////////
                 // Render the nodes:
 
                 // First, the root.
                 context.fillStyle = "yellow";
                 context.beginPath();
-                nodeRoot.render(context,
-                    nodeRoot);
+                rootNode.render(context,
+                    rootNode);
                 context.fill();
 
                 // Next the parents of the root node.
@@ -496,7 +837,7 @@ class Main {
                 rootParents.forEach((nodeChild) => {
 
                     nodeChild.render(context,
-                        nodeRoot);
+                        rootNode);
                 });
                 context.fill();
 
@@ -506,7 +847,7 @@ class Main {
                 rootChildren.forEach((nodeChild) => {
 
                     nodeChild.render(context,
-                        nodeRoot);
+                        rootNode);
                 });
                 context.fill();
 
@@ -516,7 +857,7 @@ class Main {
                 otherNodes.forEach((nodeChild) => {
 
                     nodeChild.render(context,
-                        nodeRoot);
+                        rootNode);
                 });
                 context.fill();
 
@@ -528,23 +869,23 @@ class Main {
                 otherNodes.forEach((nodeChild) => {
 
                     nodeChild.renderName(context,
-                        nodeRoot);
+                        rootNode);
                 });
                 context.fillStyle = "rgba(0,0,0,0.7)";
                 rootChildren.forEach((nodeChild) => {
 
                     nodeChild.renderName(context,
-                        nodeRoot);
+                        rootNode);
                 });
                 context.fillStyle = "rgba(0,0,0,0.7)";
                 rootParents.forEach((nodeChild) => {
 
                     nodeChild.renderName(context,
-                        nodeRoot);
+                        rootNode);
                 });
                 context.fillStyle = "rgba(0,0,0,1)";
-                nodeRoot.renderName(context,
-                    nodeRoot);
+                rootNode.renderName(context,
+                    rootNode);
 
                 // Do it again.
                 window.requestAnimationFrame(functionAnimate);
@@ -565,5 +906,4 @@ class Main {
             console.error(`error: ${x.message}.`);
         })
     }
-
 }

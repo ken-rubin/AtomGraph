@@ -14,4 +14,13 @@ module.exports = class File {
             encoding: 'utf8'
         });
     }
+
+    write(data) {
+
+        return fs.writeFileSync(this.fileName, 
+            data, { 
+            
+            encoding: 'utf8'
+        });
+    }
 };

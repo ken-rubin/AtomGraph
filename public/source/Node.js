@@ -444,6 +444,10 @@ class Node {
         }
         return this.m_arrayHookeChildren;
     }
+    set hookeChildren(arrayValue) {
+
+        this.m_arrayHookeChildren = arrayValue;
+    }
 
     // Collection of children for Coulomb force.
     get coulombChildren() {
